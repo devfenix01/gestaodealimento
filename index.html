@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SIGAE | Gestão Alimentar em Tempo Real - IFSC</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800 font-sans transition-colors duration-200">
+
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- VLibras -->
+  <div vw class="enabled">
+    <div vw-access-button class="active"></div>
+    <div vw-plugin-wrapper>
+      <div class="vw-plugin-top-wrapper"></div>
+    </div>
+  </div>
+  <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+  <script>
+    try {
+      if (window.VLibras && window.VLibras.Widget) {
+        new window.VLibras.Widget('https://vlibras.gov.br/app');
+      }
+    } catch (e) {
+      console.warn('[SIGAE] VLibras indisponível; sistema continua normalmente.', e);
+    }
+  </script>
+
+  <!-- ================= TELA DE LOGIN ================= -->
+  <div id="screen-login" class="min-h-screen flex items-center justify-center p-3 sm:p-6">
+    <div class="max-w-4xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-gray-200">
+      
+      <div class="bg-emerald-950 text-white p-6 sm:p-8 md:w-1/2 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center gap-3 mb-6">
+            <div class="bg-emerald-600 text-white font-extrabold px-2.5 py-1 rounded text-sm tracking-wider">IFSC</div>
+            <div>
+              <h1 class="font-extrabold text-xl leading-none tracking-wide">SIGAE</h1>
+              <p class="text-[10px] text-emerald-300 font-semibold tracking-wider uppercase">CÂMPUS PALHOÇA BILÍNGUE</p>
+            </div>
+          </div>
+
+          <h2 class="text-xl sm:text-2xl font-bold mb-3 leading-tight">
+            Gestão da <span class="text-emerald-400">alimentação estudantil</span> em tempo real.
+          </h2>
+
+          <p class="text-xs text-emerald-100/80 mb-6 leading-relaxed">
+            Plataforma institucional com controle rigoroso de autenticação, senhas fortes e criptografia nativa.
+          </p>
+
+          <ol class="space-y-3 text-xs text-emerald-100">
+            <li class="flex items-center gap-3">
+              <span class="bg-emerald-800 text-emerald-300 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]"><i class="fa-solid fa-user-shield"></i></span>
+              Login Gestor: ADM + 8 dígitos numéricos (ex: ADM20261234)
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="bg-emerald-800 text-emerald-300 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]"><i class="fa-solid fa-key"></i></span>
+              Senha Gestor: Mín. 8 caracteres (A-Z, a-z, 0-9, @#$!)
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="bg-emerald-800 text-emerald-300 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]"><i class="fa-solid fa-graduation-cap"></i></span>
+              Matrícula Aluno: 12 dígitos iniciando com o ano (ex: 202610704213)
+            </li>
+          </ol>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-emerald-800/60 text-[11px] text-emerald-400 flex items-center justify-between">
+          <span class="flex items-center gap-2">
+            <i class="fa-solid fa-circle text-[8px] text-emerald-400 animate-pulse"></i>
+            <span id="lbl-cloud-status">Conectando à nuvem...</span>
+          </span>
+          <span class="text-emerald-300 text-[10px] font-mono">Nuvem • Tempo Real</span>
+        </div>
+      </div>
+
+      <div class="p-6 sm:p-8 md:w-1/2 flex flex-col justify-between bg-white">
+        <div>
+          <div class="flex justify-between items-center mb-4">
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Terminal Seguro
+            </span>
+            <button onclick="toggleDarkMode()" class="text-xs font-semibold px-2.5 py-1 rounded border border-gray-300 hover:bg-gray-100 flex items-center gap-1.5">
+              <i class="fa-solid fa-moon"></i> <span id="lbl-theme-login">Modo Escuro</span>
+            </button>
+          </div>
+
+          <div class="flex bg-gray-100 p-1 rounded-lg mb-6 border border-gray-200">
+            <button id="btn-login-aluno" onclick="setLoginProfile('estudante')" class="flex-1 py-1.5 text-center text-xs font-bold rounded bg-white shadow-sm text-gray-800 flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-graduation-cap"></i> Estudante
+            </button>
+            <button id="btn-login-gestor" onclick="setLoginProfile('gestor')" class="flex-1 py-1.5 text-center text-xs font-semibold text-gray-500 flex items-center justify-center gap-1.5 hover:text-gray-800">
+              <i class="fa-solid fa-chart-line"></i> Gestor
+            </button>
+          </div>
+
+          <h3 id="login-title" class="text-lg font-bold text-gray-800 mb-1">Entrar como estudante</h3>
+          <p id="login-desc" class="text-xs text-gray-500 mb-5">Insira sua matrícula institucional e senha cadastrada.</p>
+
+          <form onsubmit="handleLogin(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1" id="lbl-login-user">Matrícula Institucional (12 dígitos)</label>
+              <input type="text" id="login-input-user" placeholder="Ex: 202610704213" required autocomplete="username" class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 uppercase font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Senha</label>
+              <div class="relative">
+                <input type="password" id="login-input-pass" placeholder="Digite sua senha segura..." required autocomplete="current-password" class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                <i id="btn-toggle-pass" onclick="togglePasswordVisibility()" class="fa-regular fa-eye absolute right-3 top-2.5 text-gray-400 text-xs cursor-pointer"></i>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-0.5">
+              <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-gray-600">
+                <input type="checkbox" id="login-remember-me" class="rounded text-emerald-700 focus:ring-emerald-600 w-3.5 h-3.5 border-gray-300">
+                <span>Lembrar meu login e senha</span>
+              </label>
+            </div>
+
+            <button type="submit" id="btn-submit-login" class="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2.5 rounded text-xs transition flex items-center justify-center gap-2 shadow-sm">
+              <i class="fa-solid fa-lock"></i> Autenticar com Segurança
+            </button>
+
+            <div class="flex justify-between text-xs font-bold text-emerald-800 pt-1">
+              <button type="button" onclick="toggleModalPrimeiroAcesso(true)" class="hover:underline text-emerald-800 font-bold">Primeiro acesso</button>
+              <button type="button" onclick="showToast('Procure o Articulador de Alimentação no campus para redefinir.', 'info')" class="hover:underline">Esqueci minha senha</button>
+            </div>
+          </form>
+
+          <div class="mt-6 border border-gray-200 rounded-lg p-3 bg-gray-50 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded border border-gray-300 bg-white flex items-center justify-center text-gray-600">
+                <i class="fa-solid fa-tablet-screen-button"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-gray-800">Tablet do refeitório</div>
+                <div class="text-[10px] text-gray-500">Validador oficial por câmera/QR Code.</div>
+              </div>
+            </div>
+            <button onclick="abrirModalTablet()" class="border border-gray-300 bg-white rounded px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 shadow-sm">Abrir</button>
+          </div>
+        </div>
+
+        <div class="mt-6 text-[11px] text-gray-400 border-t pt-3 flex items-center justify-between">
+          <span>IFSC Palhoça Bilíngue</span>
+          <span class="text-emerald-700 font-bold"><i class="fa-solid fa-shield-halved"></i> Senhas Fortes</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TELA PRINCIPAL (APLICAÇÃO) ================= -->
+  <div id="screen-app" class="hidden min-h-screen flex flex-col">
+    <header class="bg-white border-b border-gray-200 px-4 sm:px-6 py-2.5 flex items-center justify-between shadow-sm sticky top-0 z-30">
+      <div class="flex items-center gap-3">
+        <div class="bg-emerald-800 text-white font-extrabold text-xs px-2 py-1 rounded">IFSC</div>
+        <div>
+          <span class="font-extrabold text-gray-800 text-sm">SIGAE</span> 
+          <span class="text-gray-400 font-normal text-sm">| Tempo Real</span>
+          <div class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">CÂMPUS PALHOÇA BILÍNGUE</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 sm:gap-4 text-xs">
+        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span> Live Sync
+        </span>
+        <button onclick="sincronizarAgora()" class="border border-emerald-300 rounded px-2 py-1 text-emerald-800 font-semibold bg-white flex items-center gap-1 hover:bg-emerald-50 shadow-sm" title="Sincronizar agora">
+          <i class="fa-solid fa-cloud-arrow-up"></i> <span class="hidden sm:inline">Sincronizar</span>
+        </button>
+        <button onclick="toggleDarkMode()" class="border border-gray-300 rounded px-2 py-1 text-gray-700 font-semibold bg-white flex items-center gap-1 hover:bg-gray-50 shadow-sm">
+          <i class="fa-solid fa-moon"></i> <span id="lbl-theme-app" class="hidden sm:inline">Tema</span>
+        </button>
+        <button onclick="abrirModalTablet()" class="admin-only border border-gray-300 rounded px-2.5 py-1 text-gray-700 font-semibold bg-white flex items-center gap-1.5 hover:bg-gray-50 shadow-sm">
+          <i class="fa-solid fa-camera text-emerald-700"></i> <span class="hidden sm:inline">Leitor QR</span>
+        </button>
+        <div class="text-right hidden sm:block">
+          <div id="lbl-user-name" class="font-bold text-gray-800 leading-tight">Usuário</div>
+          <div id="lbl-user-role" class="text-gray-400 text-[10px]">Perfil</div>
+        </div>
+        <div id="lbl-user-avatar" class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
+          US
+        </div>
+        <button onclick="handleLogout()" class="text-gray-400 hover:text-red-700 ml-1 text-sm transition" title="Encerrar Sessão">
+          <i class="fa-solid fa-power-off"></i>
+        </button>
+      </div>
+    </header>
+
+    <nav class="bg-white border-b border-gray-200 px-4 sm:px-6 pt-3 flex gap-6 text-xs font-semibold text-gray-600 overflow-x-auto custom-scroll sticky top-12 z-20">
+      <button onclick="switchTab('tab-painel')" id="nav-tab-painel" class="nav-link active pb-2 flex items-center gap-2 whitespace-nowrap admin-only">
+        <i class="fa-solid fa-gauge-high"></i> Painel do dia
+      </button>
+      <button onclick="switchTab('tab-mural')" id="nav-tab-mural" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-hand-holding-heart text-pink-600"></i> Mural Solidário
+      </button>
+      <button onclick="switchTab('tab-alimentacao')" id="nav-tab-alimentacao" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-utensils"></i> Alimentação
+      </button>
+      <button onclick="switchTab('tab-reservas')" id="nav-tab-reservas" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-calendar-days"></i> Reservas
+      </button>
+      <button onclick="switchTab('tab-questionario')" id="nav-tab-questionario" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap estudante-only">
+        <i class="fa-solid fa-clipboard-question text-emerald-700"></i> Questionário de Permanência
+      </button>
+      <button onclick="switchTab('tab-acessos')" id="nav-tab-acessos" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap admin-only">
+        <i class="fa-solid fa-door-open"></i> Acessos
+      </button>
+      <button onclick="switchTab('tab-liberacoes')" id="nav-tab-liberacoes" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap admin-only">
+        <i class="fa-solid fa-unlock"></i> Liberações
+      </button>
+      <button onclick="switchTab('tab-estudantes')" id="nav-tab-estudantes" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap admin-only">
+        <i class="fa-solid fa-users-viewfinder"></i> Estudantes & Questionários
+      </button>
+      <button onclick="switchTab('tab-parametros')" id="nav-tab-parametros" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap admin-only">
+        <i class="fa-solid fa-sliders"></i> Parâmetros
+      </button>
+      <button onclick="switchTab('tab-limpeza')" id="nav-tab-limpeza" class="nav-link pb-2 flex items-center gap-2 whitespace-nowrap admin-only text-red-700 hover:text-red-800">
+        <i class="fa-solid fa-trash-can"></i> Manutenção de Dados
+      </button>
+    </nav>
+
+    <main class="p-4 sm:p-6 max-w-7xl mx-auto w-full flex-grow">
+      <!-- Painel do Dia -->
+      <div id="tab-painel" class="tab-content active space-y-6 admin-only">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          <div>
+            <h1 class="text-xl font-bold text-gray-800">Painel do dia</h1>
+            <p class="text-xs text-gray-500"><span id="lbl-data-hoje"></span> | Atendimento das <span id="lbl-abertura">11:30</span> às <span id="lbl-fechamento">13:30</span></p>
+          </div>
+          <button onclick="updatePainelCounters()" class="border border-gray-300 rounded px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 shadow-sm flex items-center gap-2 self-start sm:self-auto">
+            <i class="fa-solid fa-rotate-right"></i> Atualizar Contadores
+          </button>
+        </div>
+
+        <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b pb-2">
+            <h2 class="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-magnifying-glass text-emerald-700"></i> Buscar estudantes cadastrados
+            </h2>
+            <span class="text-[11px] text-gray-400">Busca em tempo real</span>
+          </div>
+          <div class="relative">
+            <input type="text" id="gestor-painel-busca-estudante" oninput="handlePainelBuscaEstudante(this.value)" placeholder="Digite o nome, matrícula ou curso do estudante..." class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 pr-10">
+            <i class="fa-solid fa-users text-gray-400 absolute right-3.5 top-3 text-xs"></i>
+          </div>
+          <div id="painel-busca-resultados" class="hidden border border-gray-200 rounded-lg overflow-hidden max-h-60 overflow-y-auto bg-gray-50 divide-y divide-gray-200 shadow-inner"></div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+          <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 border-l-4 border-l-emerald-600 shadow-sm">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">RESERVAS ATIVAS</span>
+            <div id="cnt-reservas-ativas" class="text-2xl sm:text-3xl font-black text-gray-800 my-1">0</div>
+            <span class="text-[11px] text-gray-400">hoje (Máx: <span id="cnt-capacidade-max">250</span>)</span>
+          </div>
+
+          <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 border-l-4 border-l-emerald-600 shadow-sm">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">REFEIÇÕES SERVIDAS</span>
+            <div id="cnt-refeicoes-servidas" class="text-2xl sm:text-3xl font-black text-gray-800 my-1">0</div>
+            <span class="text-[11px] text-gray-400"><span id="cnt-com-liberacao">0</span> com liberação</span>
+          </div>
+
+          <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 border-l-4 border-l-amber-500 shadow-sm">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">PENDENTES</span>
+            <div id="cnt-reservas-sem-entrada" class="text-2xl sm:text-3xl font-black text-gray-800 my-1">0</div>
+            <span class="text-[11px] text-gray-400">aguardando entrada</span>
+          </div>
+
+          <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 border-l-4 border-l-red-600 shadow-sm">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SEM RESERVA</span>
+            <div id="cnt-sem-reserva" class="text-2xl sm:text-3xl font-black text-gray-800 my-1">0</div>
+            <span class="text-[11px] text-gray-400">tentativas barradas</span>
+          </div>
+
+          <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 border-l-4 border-l-slate-400 shadow-sm col-span-2 sm:col-span-1">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CANCELAMENTOS</span>
+            <div id="cnt-cancelamentos" class="text-2xl sm:text-3xl font-black text-gray-800 my-1">0</div>
+            <span class="text-[11px] text-gray-400">no prazo</span>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center">
+          <h2 class="font-bold text-gray-800 text-sm">Frequência de comparecimento</h2>
+          <span class="text-xs text-gray-500 bg-gray-100 border border-gray-200 px-3 py-1 rounded-full font-semibold"><span id="cnt-presentes">0</span> de <span id="cnt-total-hoje">0</span> presentes</span>
+        </div>
+      </div>
+
+      <!-- Mural Solidário -->
+      <div id="tab-mural" class="tab-content space-y-6">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold text-gray-800">Mural Solidário de Refeições</h1>
+            <p class="text-xs text-gray-500">Transfira sua refeição para quem precisa ou resgate uma vaga em tempo real.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm space-y-3">
+            <h3 class="font-bold text-sm text-gray-800 border-b pb-2 flex items-center gap-2">
+              <i class="fa-solid fa-hand-holding-heart text-pink-600"></i> Doar Minha Reserva
+            </h3>
+            <p class="text-xs text-gray-500">Não poderá comparecer hoje? Disponibilize sua refeição para outro estudante:</p>
+            <button onclick="doarMinhaReservaHoje()" class="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 rounded text-xs transition flex items-center justify-center gap-2 shadow-sm">
+              <i class="fa-solid fa-gift"></i> Doar Refeição de Hoje
+            </button>
+          </div>
+
+          <div class="col-span-2 bg-white p-5 rounded-lg border border-gray-200 shadow-sm space-y-4">
+            <h3 class="font-bold text-sm text-gray-800 border-b pb-2 flex items-center gap-2">
+              <i class="fa-solid fa-utensils text-emerald-600"></i> Refeições Disponíveis para Resgate (Hoje)
+            </h3>
+            <div id="container-mural-doacoes" class="space-y-2"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alimentação / Cardápio -->
+      <div id="tab-alimentacao" class="tab-content space-y-6">
+        <div>
+          <h1 class="text-xl font-bold text-gray-800">Cardápio do Dia</h1>
+          <p class="text-xs text-gray-500">Consulte as refeições e lanches oficiais.</p>
+        </div>
+
+        <div class="bg-gradient-to-r from-emerald-800 to-emerald-950 text-white rounded-xl p-5 sm:p-6 shadow-lg space-y-4">
+          <div class="flex items-center gap-2 border-b border-emerald-700/60 pb-3">
+            <i class="fa-solid fa-utensils text-emerald-400 text-lg"></i>
+            <h2 class="font-extrabold text-base tracking-wide">ALMOÇO (11:30 - 13:30)</h2>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-xs">
+            <div class="bg-emerald-900/50 p-3.5 rounded-lg border border-emerald-700/40">
+              <span class="text-[10px] font-bold text-emerald-300 uppercase block mb-1">Prato Principal</span>
+              <p id="cardapio-prato" class="font-semibold text-emerald-50 text-sm">Carregando...</p>
+            </div>
+            <div class="bg-emerald-900/50 p-3.5 rounded-lg border border-emerald-700/40">
+              <span class="text-[10px] font-bold text-emerald-300 uppercase block mb-1">Acompanhamento</span>
+              <p id="cardapio-acompanhamento" class="font-semibold text-emerald-50 text-sm">Carregando...</p>
+            </div>
+            <div class="bg-emerald-900/50 p-3.5 rounded-lg border border-emerald-700/40">
+              <span class="text-[10px] font-bold text-emerald-300 uppercase block mb-1">Salada</span>
+              <p id="cardapio-salada" class="font-semibold text-emerald-50 text-sm">Carregando...</p>
+            </div>
+            <div class="bg-emerald-900/50 p-3.5 rounded-lg border border-emerald-700/40">
+              <span class="text-[10px] font-bold text-emerald-300 uppercase block mb-1">Sobremesa / Suco</span>
+              <p id="cardapio-sobremesa" class="font-semibold text-emerald-50 text-sm">Carregando...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div class="bg-gradient-to-r from-amber-700 to-amber-900 text-white rounded-xl p-5 shadow space-y-3">
+            <div class="flex items-center justify-between border-b border-amber-600/60 pb-2">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-mug-hot text-amber-300 text-base"></i>
+                <h3 class="font-extrabold text-sm tracking-wide">LANCHE DA TARDE</h3>
+              </div>
+              <span class="bg-amber-800 text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-500/40">15:20</span>
+            </div>
+            <div class="bg-amber-950/40 p-3.5 rounded-lg border border-amber-600/30">
+              <span class="text-[10px] font-bold text-amber-300 uppercase block mb-1">Composição do Lanche</span>
+              <p id="cardapio-lanche-tarde" class="font-semibold text-amber-50 text-sm">Carregando...</p>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-r from-indigo-800 to-indigo-950 text-white rounded-xl p-5 shadow space-y-3">
+            <div class="flex items-center justify-between border-b border-indigo-700/60 pb-2">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-bowl-food text-indigo-300 text-base"></i>
+                <h3 class="font-extrabold text-sm tracking-wide">LANCHE DA NOITE</h3>
+              </div>
+              <span class="bg-indigo-900 text-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/40">20:20</span>
+            </div>
+            <div class="bg-indigo-950/50 p-3.5 rounded-lg border border-indigo-700/30">
+              <span class="text-[10px] font-bold text-indigo-300 uppercase block mb-1">Composição do Lanche</span>
+              <p id="cardapio-lanche-noite" class="font-semibold text-indigo-50 text-sm">Carregando...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-only bg-white rounded-xl border border-gray-200 p-5 sm:p-6 shadow-sm space-y-4">
+          <div class="border-b pb-2">
+            <h3 class="font-bold text-sm text-gray-800">Atualizar Cardápio e Lanches (Gestor)</h3>
+          </div>
+          <form onsubmit="handleSalvarCardapio(event)" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Prato Principal (Almoço)</label>
+                <input type="text" id="edt-cardapio-prato" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Acompanhamento (Almoço)</label>
+                <input type="text" id="edt-cardapio-acompanhamento" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Salada (Almoço)</label>
+                <input type="text" id="edt-cardapio-salada" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Sobremesa / Suco (Almoço)</label>
+                <input type="text" id="edt-cardapio-sobremesa" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-3">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Lanche da Tarde (15:20)</label>
+                <input type="text" id="edt-cardapio-lanche-tarde" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Lanche da Noite (20:20)</label>
+                <input type="text" id="edt-cardapio-lanche-noite" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600">
+              </div>
+            </div>
+            <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 text-white font-semibold px-4 py-2 rounded text-xs transition flex items-center gap-2 shadow-sm">
+              <i class="fa-solid fa-check"></i> Salvar e Transmitir Cardápio
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Reservas -->
+      <div id="tab-reservas" class="tab-content space-y-6">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          <div>
+            <h1 class="text-xl font-bold text-gray-800">Reservas de Refeição</h1>
+            <p class="text-xs text-gray-500">Agende sua presença e gere seu QR Code seguro.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="btn-ver-qrcode-topo" onclick="abrirQRCodeEstudanteLogado()" class="estudante-only bg-emerald-800 hover:bg-emerald-900 text-white rounded px-3 py-1.5 text-xs font-semibold shadow-sm flex items-center gap-2">
+              <i class="fa-solid fa-qrcode"></i> Meu QR Code Seguro
+            </button>
+            <button onclick="abrirModalTablet()" class="admin-only bg-emerald-800 hover:bg-emerald-900 text-white rounded px-3 py-1.5 text-xs font-semibold shadow-sm flex items-center gap-2">
+              <i class="fa-solid fa-camera"></i> Leitor Gestor
+            </button>
+            <button onclick="exportCSV('reservas')" class="admin-only border border-gray-300 rounded px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 shadow-sm flex items-center gap-2">
+              <i class="fa-solid fa-file-csv"></i> Exportar CSV
+            </button>
+          </div>
+        </div>
+
+        <div id="box-agendamento-semanal" class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 shadow-sm space-y-3">
+          <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="font-bold text-sm text-gray-800 flex items-center gap-2">
+              <i class="fa-solid fa-calendar-week text-emerald-700"></i> Agendamento Semanal de Almoço
+            </h3>
+            <span class="text-xs text-emerald-700 font-semibold">Clique para marcar ou desmarcar</span>
+          </div>
+          <p class="text-xs text-gray-500">Selecione os dias da semana desejados:</p>
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 pt-2">
+            <button onclick="toggleAgendamentoDia(1)" id="btn-week-1" class="p-3 border rounded-lg text-center hover:bg-emerald-50 transition text-xs font-bold">Segunda</button>
+            <button onclick="toggleAgendamentoDia(2)" id="btn-week-2" class="p-3 border rounded-lg text-center hover:bg-emerald-50 transition text-xs font-bold">Terça</button>
+            <button onclick="toggleAgendamentoDia(3)" id="btn-week-3" class="p-3 border rounded-lg text-center hover:bg-emerald-50 transition text-xs font-bold">Quarta</button>
+            <button onclick="toggleAgendamentoDia(4)" id="btn-week-4" class="p-3 border rounded-lg text-center hover:bg-emerald-50 transition text-xs font-bold">Quinta</button>
+            <button onclick="toggleAgendamentoDia(5)" id="btn-week-5" class="p-3 border rounded-lg text-center hover:bg-emerald-50 transition text-xs font-bold">Sexta</button>
+          </div>
+        </div>
+
+        <div class="admin-only space-y-4">
+          <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 shadow-sm space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">DE</label>
+                <input type="date" id="filter-reserva-de" onchange="renderReservas()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700">
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">ATÉ</label>
+                <input type="date" id="filter-reserva-ate" onchange="renderReservas()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700">
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">CURSO</label>
+                <select id="filter-reserva-curso" onchange="renderReservas()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+                  <option value="">Todos os cursos</option>
+                  <option value="Design Grafico">Design Gráfico</option>
+                  <option value="Producao Multimidia">Produção Multimídia</option>
+                  <option value="Pedagogia">Pedagogia</option>
+                  <option value="Traducao em Libras">Tradução em Libras</option>
+                  <option value="FIC">FIC</option>
+                  <option value="PROEJA">PROEJA</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">SITUAÇÃO</label>
+                <select id="filter-reserva-situacao" onchange="renderReservas()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+                  <option value="">Todas</option>
+                  <option value="Ativa">Ativa</option>
+                  <option value="Servida">Servida (Confirmada)</option>
+                  <option value="Cancelada">Cancelada</option>
+                  <option value="Doada">Doada</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2 flex gap-2">
+                <div class="w-full">
+                  <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">ESTUDANTE</label>
+                  <input type="text" id="filter-reserva-busca" onkeyup="renderReservas()" placeholder="Nome ou matrícula" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700">
+                </div>
+                <button onclick="limparFiltrosReservas()" class="border border-gray-300 rounded px-4 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 self-end">Limpar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-x-auto custom-scroll">
+            <table class="w-full text-left text-xs text-gray-600">
+              <thead class="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase border-b">
+                <tr>
+                  <th class="p-3">Data</th>
+                  <th class="p-3">Matrícula</th>
+                  <th class="p-3">Estudante</th>
+                  <th class="p-3">Curso</th>
+                  <th class="p-3">Situação</th>
+                  <th class="p-3 text-center">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tbl-reservas" class="divide-y divide-gray-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Questionário de Permanência -->
+      <div id="tab-questionario" class="tab-content space-y-6 estudante-only">
+        <div class="bg-white p-5 sm:p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+          <div class="border-b border-emerald-100 pb-4">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Permanência Estudantil</span>
+              <span id="quest-status-badge" class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded">Não Respondido</span>
+            </div>
+            <h1 class="text-lg sm:text-xl font-black text-gray-800 tracking-tight">QUESTIONÁRIO SOBRE ALIMENTAÇÃO E PERMANÊNCIA DOS ESTUDANTES</h1>
+            <p class="text-xs text-gray-600 mt-2 leading-relaxed">
+              <strong>Prezado(a) estudante,</strong><br>
+              Suas respostas subsidiam melhorias no refeitório institucional. Os dados são protegidos com AES-GCM em tempo real.
+            </p>
+          </div>
+
+          <form id="form-questionario-permanencia" onsubmit="handleSalvarQuestionario(event)" class="space-y-5 text-xs text-gray-700">
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+              <label class="block font-bold text-gray-800">1. Em qual faixa etária você se encontra? <span class="text-red-500">*</span></label>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q1" value="Até 14 anos" required class="text-emerald-700"> Até 14 anos</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q1" value="15 anos" required class="text-emerald-700"> 15 anos</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q1" value="16 anos" required class="text-emerald-700"> 16 anos</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q1" value="17 anos" required class="text-emerald-700"> 17 anos</label>
+                <label class="flex items-center gap-2 cursor-pointer col-span-2 sm:col-span-1"><input type="radio" name="q1" value="18 anos ou mais" required class="text-emerald-700"> 18 anos ou mais</label>
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+              <label class="block font-bold text-gray-800">2. Com quem você mora atualmente? <span class="text-red-500">*</span></label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q2" value="Com os pais" required class="text-emerald-700"> Com os pais</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q2" value="Apenas com a mãe" required class="text-emerald-700"> Apenas com a mãe</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q2" value="Apenas com o pai" required class="text-emerald-700"> Apenas com o pai</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q2" value="Com outros familiares" required class="text-emerald-700"> Com outros familiares</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q2" value="Sozinho(a)" required class="text-emerald-700"> Sozinho(a)</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q2" value="Com responsável legal que não é familiar" required class="text-emerald-700"> Responsável legal não familiar</label>
+              </div>
+              <div class="pt-2">
+                <label class="flex items-center gap-2 cursor-pointer mb-1"><input type="radio" name="q2" value="Outro" id="q2-radio-outro" required class="text-emerald-700"> Outro:</label>
+                <input type="text" id="q2-text-outro" placeholder="Especifique..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+              <label class="block font-bold text-gray-800">3. Dias da semana que permanece no IFSC durante o contraturno? <span class="text-red-500">*</span></label>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="q3" value="Segunda-feira" class="q3-check text-emerald-700 rounded"> Segunda-feira</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="q3" value="Terça-feira" class="q3-check text-emerald-700 rounded"> Terça-feira</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="q3" value="Quarta-feira" class="q3-check text-emerald-700 rounded"> Quarta-feira</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="q3" value="Quinta-feira" class="q3-check text-emerald-700 rounded"> Quinta-feira</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="q3" value="Sexta-feira" class="q3-check text-emerald-700 rounded"> Sexta-feira</label>
+                <label class="flex items-center gap-2 cursor-pointer col-span-2 sm:col-span-1"><input type="checkbox" name="q3" value="Não permaneço no IFSC durante o contraturno" id="q3-check-nenhum" class="text-emerald-700 rounded"> Não permaneço</label>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <label class="block font-bold text-gray-800">4. Dias que fica no IFSC no almoço? <span class="text-red-500">*</span></label>
+                <div class="grid grid-cols-3 gap-2 pt-1">
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q4" value="Nenhum" required> Nenhum</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q4" value="1 dia" required> 1 dia</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q4" value="2 dias" required> 2 dias</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q4" value="3 dias" required> 3 dias</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q4" value="4 dias" required> 4 dias</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q4" value="5 dias" required> 5 dias</label>
+                </div>
+              </div>
+
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <label class="block font-bold text-gray-800">5. Dias que costuma almoçar no IFSC? <span class="text-red-500">*</span></label>
+                <div class="grid grid-cols-3 gap-2 pt-1">
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q5" value="Nenhum" required> Nenhum</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q5" value="1 dia" required> 1 dia</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q5" value="2 dias" required> 2 dias</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q5" value="3 dias" required> 3 dias</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q5" value="4 dias" required> 4 dias</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q5" value="5 dias" required> 5 dias</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+              <label class="block font-bold text-gray-800">6. Quando não almoça no IFSC, qual a alternativa? <span class="text-red-500">*</span></label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q6" value="Levo comida de casa" required> Levo de casa</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q6" value="Compro comida" required> Compro fora</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q6" value="Vou para casa" required> Vou para casa</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q6" value="Fico sem almoçar" required> Fico sem almoçar</label>
+              </div>
+              <div class="pt-2">
+                <label class="flex items-center gap-2 cursor-pointer mb-1"><input type="radio" name="q6" value="Outra" id="q6-radio-outra" required> Outra:</label>
+                <input type="text" id="q6-text-outra" placeholder="Especifique..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <label class="block font-bold text-gray-800">7. Atende às suas necessidades? <span class="text-red-500">*</span></label>
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q7" value="Sempre" required> Sempre</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q7" value="Frequentemente" required> Frequentemente</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q7" value="Às vezes" required> Às vezes</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q7" value="Raramente" required> Raramente</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q7" value="Nunca" required> Nunca</label>
+                </div>
+              </div>
+
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <label class="block font-bold text-gray-800">8. Avaliação geral da comida? <span class="text-red-500">*</span></label>
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q8" value="Excelente" required> Excelente</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q8" value="Boa" required> Boa</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q8" value="Regular" required> Regular</label>
+                  <label class="flex items-center gap-1.5"><input type="radio" name="q8" value="Ruim" required> Ruim</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+              <label class="block font-bold text-gray-800">9. De que forma a alimentação contribui para sua permanência? <span class="text-red-500">*</span></label>
+              <div class="space-y-2 pt-1">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q9" value="Permite que eu permaneça no câmpus durante o contraturno." required> Permite que eu permaneça no contraturno.</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q9" value="Reduz meus gastos com alimentação." required> Reduz meus gastos com alimentação.</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q9" value="Facilita minha rotina de estudos." required> Facilita minha rotina de estudos.</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q9" value="Evita que eu precise retornar para casa no horário do almoço." required> Evita voltar para casa ao meio-dia.</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q9" value="Contribui para minha concentração e disposição para estudar." required> Contribui para minha concentração.</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="q9" value="Não contribui." required> Não contribui.</label>
+                <div class="pt-1">
+                  <label class="flex items-center gap-2 cursor-pointer mb-1"><input type="radio" name="q9" value="Outra" id="q9-radio-outra" required> Outra:</label>
+                  <input type="text" id="q9-text-outra" placeholder="Descreva..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <label class="block font-bold text-gray-800">10. Importância para continuar estudando? <span class="text-red-500">*</span></label>
+                <div class="space-y-1.5 pt-1">
+                  <label class="flex items-center gap-2"><input type="radio" name="q10" value="Muito importante" required> Muito importante</label>
+                  <label class="flex items-center gap-2"><input type="radio" name="q10" value="Importante" required> Importante</label>
+                  <label class="flex items-center gap-2"><input type="radio" name="q10" value="Pouco importante" required> Pouco importante</label>
+                  <label class="flex items-center gap-2"><input type="radio" name="q10" value="Não é importante" required> Não é importante</label>
+                </div>
+              </div>
+
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <label class="block font-bold text-gray-800">11. Importância da continuidade da refeição? <span class="text-red-500">*</span></label>
+                <div class="space-y-1.5 pt-1">
+                  <label class="flex items-center gap-2"><input type="radio" name="q11" value="Extremamente importante" required> Extremamente importante</label>
+                  <label class="flex items-center gap-2"><input type="radio" name="q11" value="Muito importante" required> Muito importante</label>
+                  <label class="flex items-center gap-2"><input type="radio" name="q11" value="Moderadamente importante" required> Moderadamente importante</label>
+                  <label class="flex items-center gap-2"><input type="radio" name="q11" value="Pouco importante" required> Pouco importante</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+              <label class="block font-bold text-gray-800">12. Participa de projeto extracurricular? <span class="text-red-500">*</span></label>
+              <div class="flex gap-6">
+                <label class="flex items-center gap-2 cursor-pointer font-bold"><input type="radio" name="q12" value="Sim" required onchange="toggleQ13Obrigatorio(this.value)"> Sim</label>
+                <label class="flex items-center gap-2 cursor-pointer font-bold"><input type="radio" name="q12" value="Não" required onchange="toggleQ13Obrigatorio(this.value)"> Não</label>
+              </div>
+              <div class="pt-2">
+                <label class="block font-bold text-gray-800 mb-1">13. Se "Sim", qual(is)? <span class="text-red-500" id="req-q13">(Opcional)</span></label>
+                <input type="text" id="q13-text" placeholder="Nome dos projetos..." class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:ring-1 focus:ring-emerald-600">
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+              <label class="block font-bold text-gray-800">14. Recebe algum auxílio financeiro? <span class="text-red-500">*</span></label>
+              <div class="flex flex-wrap gap-6">
+                <label class="flex items-center gap-2 cursor-pointer font-bold"><input type="radio" name="q14" value="Sim" required onchange="toggleQ15Obrigatorio(this.value)"> Sim</label>
+                <label class="flex items-center gap-2 cursor-pointer font-bold"><input type="radio" name="q14" value="Não" required onchange="toggleQ15Obrigatorio(this.value)"> Não</label>
+                <label class="flex items-center gap-2 cursor-pointer font-bold"><input type="radio" name="q14" value="Não sei informar" required onchange="toggleQ15Obrigatorio(this.value)"> Não sei</label>
+              </div>
+              <div class="pt-2">
+                <label class="block font-bold text-gray-800 mb-1">15. Se "Sim", qual(is)? <span class="text-red-500" id="req-q15">(Opcional)</span></label>
+                <input type="text" id="q15-text" placeholder="Ex: Auxílio Permanência..." class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:ring-1 focus:ring-emerald-600">
+              </div>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+              <label class="block font-bold text-gray-800">16. Comentários, críticas ou sugestões: <span class="text-red-500">*</span></label>
+              <textarea id="q16-text" required rows="3" placeholder="Sua mensagem..." class="w-full border border-gray-300 rounded px-3 py-2 text-xs focus:ring-1 focus:ring-emerald-600"></textarea>
+            </div>
+
+            <div class="pt-3 flex justify-end">
+              <button type="submit" class="w-full sm:w-auto bg-emerald-800 hover:bg-emerald-900 text-white font-bold px-6 py-2.5 rounded text-xs transition flex items-center justify-center gap-2 shadow">
+                <i class="fa-solid fa-lock"></i> Criptografar e Enviar Respostas
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Acessos -->
+      <div id="tab-acessos" class="tab-content space-y-6 admin-only">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold text-gray-800">Histórico de acessos confirmados</h1>
+            <p class="text-xs text-gray-500">Validações por QR Code do refeitório.</p>
+          </div>
+          <button onclick="exportCSV('acessos')" class="border border-gray-300 rounded px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 shadow-sm flex items-center gap-2">
+            <i class="fa-solid fa-file-csv"></i> Exportar CSV
+          </button>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-x-auto custom-scroll">
+          <table class="w-full text-left text-xs text-gray-600">
+            <thead class="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase border-b">
+              <tr>
+                <th class="p-3">Data/Hora</th>
+                <th class="p-3">Estudante</th>
+                <th class="p-3">Matrícula</th>
+                <th class="p-3">Resultado</th>
+                <th class="p-3 text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-acessos" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Liberações Excepcionais -->
+      <div id="tab-liberacoes" class="tab-content space-y-6 admin-only">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold text-gray-800">Liberações excepcionais</h1>
+            <p class="text-xs text-gray-500">Autorizações manuais registradas pelo articulador.</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div class="p-4 bg-gray-50 border-b border-gray-200">
+            <h2 class="font-bold text-xs text-gray-800">Registrar nova liberação</h2>
+          </div>
+          <form onsubmit="handleSalvarLiberacao(event)" class="p-4 sm:p-5 space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Tipo</label>
+              <select id="lib-tipo" class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700 bg-white">
+                <option value="Aluno">Aluno</option>
+                <option value="Visitante">Visitante / Servidor</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Matrícula (opcional)</label>
+              <input type="text" id="lib-matricula" placeholder="Ex: 202610704213" onblur="autoPreencherNomeLiberacao()" class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Nome Completo</label>
+              <input type="text" id="lib-nome" placeholder="Nome da pessoa" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Motivo</label>
+              <input type="text" id="lib-motivo" placeholder="Descreva o motivo da liberação avulsa..." required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-emerald-600">
+            </div>
+
+            <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 text-white font-semibold px-4 py-2 rounded text-xs transition flex items-center gap-2 shadow-sm">
+              <i class="fa-solid fa-check"></i> Salvar Liberação
+            </button>
+          </form>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-x-auto custom-scroll">
+          <table class="w-full text-left text-xs text-gray-600">
+            <thead class="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase border-b">
+              <tr>
+                <th class="p-3">Data</th>
+                <th class="p-3">Tipo</th>
+                <th class="p-3">Matrícula</th>
+                <th class="p-3">Nome</th>
+                <th class="p-3">Motivo</th>
+                <th class="p-3 text-center">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-liberacoes" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Estudantes & Questionários -->
+      <div id="tab-estudantes" class="tab-content space-y-6 admin-only">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          <div>
+            <h1 class="text-xl font-bold text-gray-800">Estudantes & Questionários</h1>
+            <p class="text-xs text-gray-500">Dados cadastrais e status socioalimentar.</p>
+          </div>
+          <button onclick="toggleModalEstudante(true)" class="bg-emerald-800 hover:bg-emerald-900 text-white rounded px-3 py-1.5 text-xs font-semibold shadow-sm flex items-center gap-2 self-start sm:self-auto">
+            <i class="fa-solid fa-user-plus"></i> Novo estudante
+          </button>
+        </div>
+
+        <div class="bg-white p-4 sm:p-5 rounded-lg border border-gray-200 shadow-sm space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1"><i class="fa-solid fa-magnifying-glass text-emerald-700 mr-1"></i> BUSCAR</label>
+              <input type="text" id="filter-estudante-busca" onkeyup="renderEstudantes()" placeholder="Nome ou matrícula..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">CURSO</label>
+              <select id="filter-estudante-curso" onchange="renderEstudantes()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+                <option value="">Todos os cursos</option>
+                <option value="Design Grafico">Design Gráfico</option>
+                <option value="Producao Multimidia">Produção Multimídia</option>
+                <option value="Pedagogia">Pedagogia</option>
+                <option value="Traducao em Libras">Tradução em Libras</option>
+                <option value="FIC">FIC</option>
+                <option value="PROEJA">PROEJA</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">STATUS</label>
+              <select id="filter-estudante-situacao" onchange="renderEstudantes()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+                <option value="">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Bloqueado">Bloqueado</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">QUESTIONÁRIO</label>
+              <select id="filter-estudante-questionario" onchange="renderEstudantes()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+                <option value="">Todos</option>
+                <option value="Respondido">Respondido</option>
+                <option value="Pendente">Pendente</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-x-auto custom-scroll">
+          <table class="w-full text-left text-xs text-gray-600">
+            <thead class="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase border-b">
+              <tr>
+                <th class="p-3">Matrícula</th>
+                <th class="p-3">Nome</th>
+                <th class="p-3">Curso</th>
+                <th class="p-3">Restrição</th>
+                <th class="p-3">Assiduidade</th>
+                <th class="p-3">Questionário</th>
+                <th class="p-3">Status</th>
+                <th class="p-3 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-estudantes" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Parâmetros de Funcionamento -->
+      <div id="tab-parametros" class="tab-content space-y-6 admin-only">
+        <div class="bg-white p-5 sm:p-6 rounded-lg border border-gray-200 shadow-sm space-y-6">
+          <h2 class="font-bold text-sm text-gray-800 border-b pb-2">Parâmetros de Funcionamento da Unidade</h2>
+          <form onsubmit="handleSalvarParametros(event)" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Campus</label>
+                <input type="text" id="param-campus" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Capacidade diária de refeições</label>
+                <input type="number" id="param-capacidade" min="1" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Limite para reservar (dia anterior)</label>
+                <input type="time" id="param-limite-reserva" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Limite para cancelar (dia do almoço)</label>
+                <input type="time" id="param-limite-cancelar" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Horário de Abertura</label>
+                <input type="time" id="param-abertura" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Horário de Fechamento</label>
+                <input type="time" id="param-fechamento" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Mensagem Autorizado</label>
+                <input type="text" id="param-msg-aut" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Mensagem Sem Reserva</label>
+                <input type="text" id="param-msg-sem" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Mensagem Já Registrado</label>
+                <input type="text" id="param-msg-reg" required class="w-full border border-gray-300 rounded px-3 py-2 text-xs text-gray-700">
+              </div>
+            </div>
+
+            <div>
+              <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 text-white font-semibold px-4 py-2 rounded text-xs transition flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-check"></i> Salvar e Aplicar Parâmetros
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Manutenção e Higienização de Dados -->
+      <div id="tab-limpeza" class="tab-content space-y-6 admin-only">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold text-red-700 flex items-center gap-2">
+              <i class="fa-solid fa-triangle-exclamation"></i> Manutenção e Higienização de Dados
+            </h1>
+            <p class="text-xs text-gray-500">Expurgo seguro de registros sensíveis e reset do ambiente.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center gap-2 text-emerald-800 font-bold text-sm mb-1">
+                <i class="fa-solid fa-calendar-days"></i> Reservas Cadastradas
+              </div>
+              <p class="text-xs text-gray-500">Exclui todos os agendamentos e históricos de refeições.</p>
+            </div>
+            <button onclick="limparColecaoDados('reservas', 'Todas as reservas')" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-trash-can"></i> Limpar Todas as Reservas
+            </button>
+          </div>
+
+          <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center gap-2 text-emerald-800 font-bold text-sm mb-1">
+                <i class="fa-solid fa-clipboard-question"></i> Questionários Salvos
+              </div>
+              <p class="text-xs text-gray-500">Limpa todas as respostas criptografadas do questionário estudantil.</p>
+            </div>
+            <button onclick="limparColecaoDados('questionarios_secure', 'Todos os questionários')" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-trash-can"></i> Limpar Questionários
+            </button>
+          </div>
+
+          <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center gap-2 text-emerald-800 font-bold text-sm mb-1">
+                <i class="fa-solid fa-door-open"></i> Histórico de Acessos
+              </div>
+              <p class="text-xs text-gray-500">Limpa todas as leituras de QR Code da catraca/tablet.</p>
+            </div>
+            <button onclick="limparColecaoDados('acessos', 'O histórico de acessos')" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-trash-can"></i> Limpar Histórico de Acessos
+            </button>
+          </div>
+
+          <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center gap-2 text-emerald-800 font-bold text-sm mb-1">
+                <i class="fa-solid fa-unlock"></i> Liberações Avulsas
+              </div>
+              <p class="text-xs text-gray-500">Remove todas as autorizações excepcionais e de convidados.</p>
+            </div>
+            <button onclick="limparColecaoDados('liberacoes', 'Todas as liberações')" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-trash-can"></i> Limpar Liberações
+            </button>
+          </div>
+
+          <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center gap-2 text-pink-700 font-bold text-sm mb-1">
+                <i class="fa-solid fa-hand-holding-heart"></i> Mural Solidário
+              </div>
+              <p class="text-xs text-gray-500">Remove doações e trocas de refeições ativas.</p>
+            </div>
+            <button onclick="limparColecaoDados('mural', 'Todas as doações do Mural')" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-trash-can"></i> Limpar Mural Solidário
+            </button>
+          </div>
+
+          <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center gap-2 text-amber-700 font-bold text-sm mb-1">
+                <i class="fa-solid fa-users"></i> Estudantes Cadastrados
+              </div>
+              <p class="text-xs text-gray-500">Exclui todos os estudantes cadastrados (exceto contas gestoras).</p>
+            </div>
+            <button onclick="limparEstudantesCadastrados()" class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-user-slash"></i> Limpar Estudantes
+            </button>
+          </div>
+
+          <div class="bg-red-50 p-5 rounded-lg border border-red-300 shadow-sm flex flex-col justify-between space-y-3 md:col-span-2 lg:col-span-3">
+            <div>
+              <div class="flex items-center gap-2 text-red-800 font-extrabold text-sm mb-1">
+                <i class="fa-solid fa-arrows-rotate"></i> Restaurar Padrão Seguro de Fábrica
+              </div>
+              <p class="text-xs text-red-700">Restaura todo o banco para o estado original com a senha padrão do gestor (@Gestor#2026).</p>
+            </div>
+            <button onclick="resetarBancoTotal()" class="w-full bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-3 rounded text-xs transition flex items-center justify-center gap-2 shadow-sm">
+              <i class="fa-solid fa-bomb"></i> Resetar Todo o Sistema
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= MODAIS ================= -->
+  <div id="modal-ficha-aluno" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-id-card text-emerald-700"></i> Ficha do Estudante (Restrito ao Gestor)
+        </h3>
+        <button onclick="toggleModalFichaAluno(false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-4 text-xs overflow-y-auto custom-scroll pr-1 flex-grow">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50 p-3 rounded border">
+          <div><span class="font-bold text-gray-500">NOME:</span> <p id="ficha-nome" class="font-semibold text-gray-800"></p></div>
+          <div><span class="font-bold text-gray-500">MATRÍCULA:</span> <p id="ficha-mat" class="font-mono font-bold text-emerald-800"></p></div>
+          <div><span class="font-bold text-gray-500">CURSO:</span> <p id="ficha-curso"></p></div>
+          <div><span class="font-bold text-gray-500">RESTRIÇÃO:</span> <p id="ficha-restricao" class="font-bold text-amber-600"></p></div>
+          <div><span class="font-bold text-gray-500">ASSIDUIDADE:</span> <p id="ficha-assiduidade" class="font-bold text-emerald-700 text-sm"></p></div>
+          <div><span class="font-bold text-gray-500">QUESTIONÁRIO:</span> <p id="ficha-questionario-status" class="font-bold text-xs"></p></div>
+        </div>
+
+        <div id="ficha-box-bloqueio" class="hidden p-3 rounded bg-red-50 border border-red-200 text-red-800">
+          <span class="font-bold block mb-1"><i class="fa-solid fa-lock"></i> Estudante Bloqueado</span>
+          <p class="text-[11px] mb-2">Informe a justificativa do gestor para efetuar a liberação:</p>
+          <div class="flex gap-2">
+            <input type="text" id="ficha-input-justificativa" placeholder="Motivo do desbloqueio..." class="flex-1 border rounded px-2 py-1 text-xs">
+            <button onclick="desbloquearEstudanteGestor()" class="bg-red-700 hover:bg-red-800 text-white font-bold px-3 py-1 rounded text-xs">Desbloquear</button>
+          </div>
+        </div>
+
+        <div class="border rounded-lg p-3 bg-emerald-50/50 border-emerald-200 space-y-2">
+          <h4 class="font-extrabold text-gray-800 flex items-center justify-between text-xs">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-700"></i> Respostas Descriptografadas do Questionário</span>
+            <span id="ficha-quest-data" class="text-[10px] text-gray-500 font-normal"></span>
+          </h4>
+          <div id="ficha-quest-conteudo" class="space-y-2 text-[11px] text-gray-700 bg-white p-3 rounded border border-gray-200 max-h-60 overflow-y-auto divide-y divide-gray-100"></div>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-gray-700 mb-2">Histórico Recente de Acessos</h4>
+          <div class="max-h-36 overflow-y-auto border rounded divide-y">
+            <table class="w-full text-left text-[11px]">
+              <thead class="bg-gray-100 font-bold text-gray-600 sticky top-0">
+                <tr><th class="p-2">Data/Hora</th><th class="p-2">Resultado</th></tr>
+              </thead>
+              <tbody id="ficha-tbl-acessos"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t flex justify-between">
+        <button onclick="excluirEstudantePorMatricula(currentFichaMatricula)" class="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+          <i class="fa-solid fa-trash-can"></i> Excluir Aluno
+        </button>
+        <button onclick="toggleModalFichaAluno(false)" class="bg-emerald-800 hover:bg-emerald-900 text-white rounded px-4 py-1.5 text-xs font-semibold">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-tablet" class="fixed inset-0 bg-black/60 backdrop-blur-md hidden items-center justify-center p-3 sm:p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-4 sm:p-6 text-center space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-camera text-emerald-700"></i> Validador de QR Code em Tempo Real
+        </h3>
+        <button onclick="fecharModalTablet()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="relative bg-black rounded-lg overflow-hidden min-h-[220px] flex items-center justify-center border-2 border-emerald-600">
+        <div id="reader" class="w-full"></div>
+      </div>
+
+      <div class="pt-2 border-t flex gap-2">
+        <input type="text" id="tablet-manual-mat" placeholder="Digitar matrícula manualmente..." class="flex-1 border border-gray-300 rounded px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600">
+        <button onclick="processarLeituraMatricula(document.getElementById('tablet-manual-mat').value.trim())" class="bg-emerald-800 hover:bg-emerald-900 text-white font-bold px-4 py-2 rounded text-xs">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-resultado-refeitorio" class="fixed inset-0 hidden items-center justify-center p-6 z-50 transition-all duration-300">
+    <div class="text-center text-white space-y-4 max-w-md">
+      <div id="res-icon" class="text-7xl mb-2"></div>
+      <h2 id="res-title" class="text-3xl font-black uppercase tracking-wider"></h2>
+      <p id="res-student" class="text-xl font-bold"></p>
+      
+      <div id="res-health-alert" class="hidden bg-amber-400 text-amber-950 font-extrabold p-3 rounded-lg border-2 border-amber-200 text-sm shadow-md">
+        <i class="fa-solid fa-triangle-exclamation mr-1"></i> <span id="res-health-text"></span>
+      </div>
+
+      <p id="res-msg" class="text-sm opacity-90"></p>
+      <button onclick="fecharResultadoRefeitorio()" class="mt-6 bg-white text-gray-900 font-extrabold px-8 py-3 rounded-full shadow-lg text-sm uppercase tracking-wide hover:bg-gray-100 transition">Próximo</button>
+    </div>
+  </div>
+
+  <div id="modal-primeiro-acesso" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 sm:p-6 space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-sm text-gray-800">Criar Novo Acesso Seguro</h3>
+        <button onclick="toggleModalPrimeiroAcesso(false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleCadastrarPrimeiroAcesso(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Tipo de Usuário</label>
+          <select id="pa-tipo" onchange="alternarCamposPrimeiroAcesso()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+            <option value="estudante">Estudante</option>
+            <option value="gestor">Gestor</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1" id="lbl-pa-user">Matrícula (12 dígitos)</label>
+          <input type="text" id="pa-user" required placeholder="Ex: 202610704213" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs uppercase font-mono">
+          <p id="desc-pa-user" class="text-[10px] text-gray-500 mt-0.5">Matrícula de 12 dígitos iniciando com o ano letivo.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Nome Completo</label>
+          <input type="text" id="pa-nome" required placeholder="Digite seu nome" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs">
+        </div>
+        <div id="box-pa-curso">
+          <label class="block text-xs font-bold text-gray-700 mb-1">Selecione seu Curso</label>
+          <select id="pa-curso" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+            <option value="Design Grafico">Design Gráfico</option>
+            <option value="Producao Multimidia">Produção Multimídia</option>
+            <option value="Pedagogia">Pedagogia</option>
+            <option value="Traducao em Libras">Tradução em Libras</option>
+            <option value="FIC">FIC</option>
+            <option value="PROEJA">PROEJA</option>
+          </select>
+        </div>
+        <div id="box-pa-restricao">
+          <label class="block text-xs font-bold text-gray-700 mb-1">Restrição Alimentar</label>
+          <select id="pa-restricao" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+            <option value="Nenhuma">Nenhuma</option>
+            <option value="Vegetariano">Vegetariano</option>
+            <option value="Vegano">Vegano</option>
+            <option value="Intolerante a Lactose">Intolerante a Lactose</option>
+            <option value="Celiaco (Gluten)">Celíaco (Glúten)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1" id="lbl-pa-pass">Criar Senha Segura</label>
+          <input type="password" id="pa-pass" required placeholder="Mín. 8 caracteres..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs">
+          <p id="desc-pa-pass" class="text-[10px] text-gray-500 mt-1 leading-tight">Exigido: Mínimo 8 caracteres com maiúsculas, minúsculas, números e caracteres especiais (ex: @Gestor#2026).</p>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="toggleModalPrimeiroAcesso(false)" class="border rounded px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button type="submit" id="btn-save-primeiro-acesso" class="bg-emerald-800 hover:bg-emerald-900 text-white rounded px-3 py-1.5 text-xs font-semibold">Criar Conta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-qrcode" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-sm text-gray-800">QR Code Oficial Assinado</h3>
+        <button onclick="toggleModalQRCode(false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="space-y-1">
+        <h4 id="qr-modal-nome" class="font-extrabold text-base text-gray-900">Nome</h4>
+        <p id="qr-modal-mat" class="text-xs font-mono font-bold text-emerald-800"></p>
+        <p id="qr-modal-data" class="text-xs font-semibold text-emerald-600"></p>
+      </div>
+
+      <div class="flex justify-center p-4 bg-gray-50 border rounded-lg min-h-[200px] items-center">
+        <div id="qrcode-container"></div>
+      </div>
+
+      <p class="text-[11px] text-gray-400">QR Code com token anti-fraude vinculado à data e matrícula.</p>
+
+      <div class="pt-2 flex flex-col gap-2">
+        <button onclick="baixarQRCode()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2 rounded text-xs flex items-center justify-center gap-2 shadow-sm">
+          <i class="fa-solid fa-download"></i> Baixar QR Code (PNG)
+        </button>
+        <button onclick="toggleModalQRCode(false)" class="w-full border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold py-2 rounded text-xs">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-estudante" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-5 sm:p-6 space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-sm text-gray-800">Cadastrar Novo Estudante</h3>
+        <button onclick="toggleModalEstudante(false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleCadastrarEstudante(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Matrícula (12 dígitos)</label>
+          <input type="text" id="new-estudante-mat" maxlength="12" pattern="^(20\d{2})\d{8}$" title="A matrícula deve conter 12 dígitos iniciando com o ano letivo." required placeholder="Ex: 202610704213" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs uppercase font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Nome Completo</label>
+          <input type="text" id="new-estudante-nome" required placeholder="Nome do aluno" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Curso</label>
+          <select id="new-estudante-curso" required class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+            <option value="Design Grafico">Design Gráfico</option>
+            <option value="Producao Multimidia">Produção Multimídia</option>
+            <option value="Pedagogia">Pedagogia</option>
+            <option value="Traducao em Libras">Tradução em Libras</option>
+            <option value="FIC">FIC</option>
+            <option value="PROEJA">PROEJA</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Restrição Alimentar</label>
+          <select id="new-estudante-restricao" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 bg-white">
+            <option value="Nenhuma">Nenhuma</option>
+            <option value="Vegetariano">Vegetariano</option>
+            <option value="Vegano">Vegano</option>
+            <option value="Intolerante a Lactose">Intolerante a Lactose</option>
+            <option value="Celiaco (Gluten)">Celíaco (Glúten)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Senha Inicial Forte</label>
+          <input type="password" id="new-estudante-pass" required placeholder="Ex: @Aluno2026!" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs">
+          <p class="text-[10px] text-gray-500 mt-1">Exigido: Mín. 8 caracteres, maiúscula, minúscula, número e símbolo.</p>
+        </div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="toggleModalEstudante(false)" class="border rounded px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 text-white rounded px-3 py-1.5 text-xs font-semibold">Salvar com Hash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

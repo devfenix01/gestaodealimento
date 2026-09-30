@@ -1,0 +1,52 @@
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.nav-link.active {
+  color: #065f46;
+  border-bottom: 2px solid #065f46;
+}
+
+body.dark-mode {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+body.dark-mode .bg-white {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .text-gray-800, 
+body.dark-mode .text-gray-700 {
+  color: #f1f5f9 !important;
+}
+
+body.dark-mode .text-gray-600, 
+body.dark-mode .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+body.dark-mode .bg-gray-50, 
+body.dark-mode .bg-gray-100 {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode input, 
+body.dark-mode select, 
+body.dark-mode textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.custom-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
